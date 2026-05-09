@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Square, Download, Activity, Zap, Clock, Database, SlidersHorizontal, Sun, Moon } from 'lucide-react';
+import { balancedStrategy, smartStrategy } from '@/hooks/useSpeedTest.strategies';
 
 export function DashboardLayout({
     groups,
@@ -22,13 +23,23 @@ export function DashboardLayout({
     theme,
     onToggleTheme,
     startDisabled,
-    showNoNodeToast
+    showNoNodeToast,
+    speedStrategy,
+    onStrategyChange,
+    smartConfig,
+    onSmartConfigChange,
 }) {
     const chartRef = useRef(null);
     const scrollRef = useRef(null);
     const statsGridRef = useRef(null);
     const [showFloatingStats, setShowFloatingStats] = React.useState(false);
     const [threadCount, setThreadCount] = React.useState(16);
+    const [localTopK, setLocalTopK] = React.useState(smartConfig?.topK ?? 8);
+
+    // Sync local Top-K when smartConfig changes from parent
+    React.useEffect(() => {
+        setLocalTopK(smartConfig?.topK ?? 8);
+    }, [smartConfig?.topK]);
     // Auto-scroll logs
     useEffect(() => {
         if (scrollRef.current) {
@@ -146,7 +157,7 @@ export function DashboardLayout({
                                     ) : (
                                         <Button
                                             size="sm"
-                                            onClick={() => onStart(threadCount)}
+                                            onClick={() => onStart(threadCount, speedStrategy?.id === 'smart' ? { topK: localTopK, screeningRequests: smartConfig?.screeningRequests ?? 3 } : {})}
                                             disabled={startDisabled}
                                             className="h-8 rounded-full px-3"
                                         >
@@ -196,7 +207,7 @@ export function DashboardLayout({
                                 ) : (
                                     <Button
                                         size="sm"
-                                        onClick={() => onStart(threadCount)}
+                                        onClick={() => onStart(threadCount, speedStrategy?.id === 'smart' ? { topK: localTopK, screeningRequests: smartConfig?.screeningRequests ?? 3 } : {})}
                                         disabled={startDisabled}
                                         className="px-3 transition-all duration-300"
                                     >
@@ -249,6 +260,46 @@ export function DashboardLayout({
                             </div>
                         </CardContent>
                     </Card>
+                    {/* Strategy Selector — compact horizontal tabs */}
+                    <div className="mb-4 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                            <Zap className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Strategy</span>
+                            <div className="flex gap-1.5 flex-1">
+                                {[balancedStrategy, smartStrategy].map((s) => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => !isTesting && onStrategyChange(s)}
+                                        disabled={isTesting}
+                                        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${isTesting ? 'opacity-40 cursor-not-allowed' : ''} ${speedStrategy?.id === s.id ? 'border-[#0070F3] bg-[#0070F3]/10 text-[#0070F3]' : 'border-border/60 bg-muted/50 text-muted-foreground hover:border-[#0070F3]/40 hover:text-foreground'}`}
+                                    >
+                                        {s.label}
+                                        {speedStrategy?.id === s.id && (
+                                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#0070F3] text-[9px] font-bold text-white leading-none">✓</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {/* Top-K slider — only for Smart strategy, inline compact */}
+                        {speedStrategy?.id === 'smart' && !isTesting && (
+                            <div className="flex items-center gap-2 pl-5">
+                                <span className="text-[11px] text-muted-foreground whitespace-nowrap">Top-K</span>
+                                <Slider
+                                    value={[localTopK]}
+                                    max={16}
+                                    min={1}
+                                    step={1}
+                                    className="flex-1"
+                                    onValueChange={([v]) => {
+                                        setLocalTopK(v);
+                                        onSmartConfigChange?.({ ...smartConfig, topK: v });
+                                    }}
+                                />
+                                <span className="text-[11px] font-bold tabular-nums w-4 text-right">{localTopK}</span>
+                            </div>
+                        )}
+                    </div>
                     <Card className="flex-1 flex flex-col overflow-hidden">
                         <CardHeader className="py-4 border-b">
                             <CardTitle className="text-sm font-medium uppercase tracking-wider flex items-center gap-2">

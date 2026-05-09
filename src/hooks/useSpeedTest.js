@@ -5,6 +5,7 @@ import {
     readStreamChunkWithTimeout,
     selectHealthyTrafficNode,
 } from '../lib/speedMetrics';
+import { balancedStrategy, smartStrategy } from './useSpeedTest.strategies';
 
 const CONFIG = {
     requestTimeout: 5000,
@@ -14,7 +15,13 @@ const CONFIG = {
     minUsefulTrafficBytes: 512 * 1024,
     logLimit: 50,
     chartUpdateInterval: 1000,
-    latencyUpdateInterval: 1000
+    latencyUpdateInterval: 1000,
+    // CPU optimization: jitter ranges (ms)
+    aggregateJitterMs: 200,
+    latencySweepJitterMs: 100,
+    threadInitDelayMaxMs: 500,
+    workerStatsThrottleMs: 5000,
+    failureBackoffMaxMs: 4000,
 };
 
 export function useSpeedTest() {
@@ -56,6 +63,10 @@ export function useSpeedTest() {
     const lastAggregateTimeRef = useRef(0);
     const peakSpeedRef = useRef(0);
     const nodeCursorRef = useRef(0);
+    const workerStatsLastUpdateRef = useRef(0);
+    const workerStatsThrottleRef = useRef(false);
+    const strategyStateRef = useRef(null);
+    const aggregateUsesIntervalRef = useRef(false); // true = setInterval (balanced), false = setTimeout (smart)
 
     // State for per-node status table
     const [workerStats, setWorkerStats] = useState([]);
@@ -129,16 +140,17 @@ export function useSpeedTest() {
     };
 
     // A single thread that continuously picks a random node and downloads
-    const runTrafficThread = async (threadId, nodes, signal) => {
+    const runTrafficThread = async (threadId, nodes, signal, strategy) => {
         activeThreadsRef.current++;
 
         while (!signal.aborted) {
-            const selected = selectHealthyTrafficNode(
-                nodes,
-                nodeStatsRef.current,
-                nodeCursorRef.current,
-                Date.now()
-            );
+            const strategyState = strategyStateRef.current;
+            const selected = strategy.selectNode({
+                strategyState,
+                nodeStatsRef,
+                nodeCursorRef,
+                now: Date.now()
+            });
 
             if (!selected) {
                 await new Promise(r => setTimeout(r, 250));
@@ -178,6 +190,10 @@ export function useSpeedTest() {
                 if (nodeStatsRef.current[nodeId]) {
                     nodeStatsRef.current[nodeId].latency = lat;
                 }
+                // Notify strategy of this response (for Smart strategy TTFB tracking)
+                if (strategy.onDownloadResponse) {
+                    strategy.onDownloadResponse({ strategyState: strategyStateRef.current, nodeStatsRef }, nodeId, lat);
+                }
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 if (!response.body) throw new Error("No body");
@@ -195,8 +211,9 @@ export function useSpeedTest() {
                     );
                     if (done) break;
 
-                    // Force rotation of connections to allow latency checks and fresh TTFB samples
-                    if (performance.now() - streamStartTime > 2000) {
+                    // Strategy-controlled connection rotation: balanced=2000ms (original), smart=0 (disabled)
+                    const rotationMs = strategy.connectionRotationMs ?? 0;
+                    if (rotationMs > 0 && performance.now() - streamStartTime > rotationMs) {
                         try {
                              await reader.cancel();
                         } catch (e) {
@@ -251,8 +268,10 @@ export function useSpeedTest() {
                 cleanup();
             }
 
-            // Small delay to prevent CPU spinning if network fails instantly
-            await new Promise(r => setTimeout(r, 50));
+            // Exponential backoff on failure (CPU optimization: avoid high-frequency re-scheduling)
+            const failures = nodeStatsRef.current[nodeId]?.failures || 0;
+            const backoffMs = Math.min(CONFIG.failureBackoffMaxMs, 50 * Math.pow(2, failures));
+            await new Promise(r => setTimeout(r, backoffMs));
         }
 
         activeThreadsRef.current--;
@@ -325,7 +344,13 @@ export function useSpeedTest() {
             duration
         });
 
-        setWorkerStats(currentStats.sort((a, b) => a.id - b.id));
+        // Throttle setWorkerStats only for smart strategy (balanced keeps original 1s update)
+        if (!workerStatsThrottleRef.current ||
+            !workerStatsLastUpdateRef.current ||
+            (performance.now() - workerStatsLastUpdateRef.current) >= CONFIG.workerStatsThrottleMs) {
+            setWorkerStats(currentStats.sort((a, b) => a.id - b.id));
+            workerStatsLastUpdateRef.current = performance.now();
+        }
 
         // 4. Update Chart
         const cData = chartDataRef.current;
@@ -338,7 +363,7 @@ export function useSpeedTest() {
         }
     };
 
-    const startTest = (nodes, threadCount = 16) => {
+    const startTest = (nodes, threadCount = 16, strategy = balancedStrategy, strategyConfig = {}) => {
         if (!nodes || nodes.length === 0) {
             appendLog('No nodes selected.', 'warning');
             setTestStatus('No nodes selected');
@@ -346,6 +371,9 @@ export function useSpeedTest() {
         }
 
         if (isTesting) stopTest();
+
+        // Reset throttle
+        workerStatsLastUpdateRef.current = 0;
 
         setIsTesting(true);
         setTestStatus(`Running (${threadCount} Threads)`);
@@ -358,7 +386,7 @@ export function useSpeedTest() {
         peakSpeedRef.current = 0;
         nodeCursorRef.current = 0;
 
-        // Initialize Node Stats
+        // Initialize Node Stats for all nodes
         nodes.forEach(n => {
             nodeStatsRef.current[n.id] = {
                 id: n.id,
@@ -378,57 +406,116 @@ export function useSpeedTest() {
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        appendLog(`Started Traffic Mode: ${nodes.length} Nodes, ${threadCount} Threads.`, 'info');
+        // Initialize strategy state
+        const stratState = strategy.initialize(nodes, strategyConfig);
+        strategyStateRef.current = stratState;
+        workerStatsThrottleRef.current = strategy.throttleWorkerStats ?? false;
+        aggregateUsesIntervalRef.current = !strategy.useJitter;
 
-        const runLatencySweep = () => {
-            if (signal.aborted) return;
+        // Smart strategy: run Phase 1 screening before launching threads
+        const launchThreads = async () => {
+            if (!strategy.hasLatencySweep) {
+                await strategy.runPhase1Screening(stratState, signal, nodeStatsRef, appendLog);
+            }
 
-            nodes.forEach(node => {
-                const entry = nodeStatsRef.current[node.id];
-                if (!entry || entry.isPinging) return;
+            appendLog(`Started ${strategy.label}: ${stratState.qualifyingNodes ? stratState.qualifyingNodes.length : nodes.length} Nodes, ${threadCount} Threads.`, 'info');
 
-                // Mark as pinging to prevent overlapping checks for this specific node
-                entry.isPinging = true;
-                if (entry.status === 'pending') entry.status = 'pinging';
-
-                measureLatency(node, signal)
-                    .then(lat => {
-                        if (!signal.aborted && nodeStatsRef.current[node.id]) {
-                            // Only update if success, or if we want to show failure (latency=null)
-                            // But since traffic threads also update latency, we don't want to overwrite a valid value with null due to queue timeout
-                            if (lat !== null) {
-                                nodeStatsRef.current[node.id].latency = lat;
-                            }
+            // Launch Thread Pool with staggered startup (CPU optimization)
+            const actualThreads = Math.max(1, Math.min(64, threadCount));
+            const nodesToUse = stratState.qualifyingNodes || stratState.nodes;
+            for (let i = 0; i < actualThreads; i++) {
+                if (strategy.useJitter) {
+                    // Smart: stagger thread startup to avoid thundering herd
+                    const delay = Math.floor(Math.random() * CONFIG.threadInitDelayMaxMs);
+                    setTimeout(() => {
+                        if (!signal.aborted) {
+                            runTrafficThread(i, nodesToUse, signal, strategy);
                         }
-                    })
-                    .finally(() => {
-                        if (nodeStatsRef.current[node.id]) {
-                            nodeStatsRef.current[node.id].isPinging = false;
-                        }
-                    });
-            });
+                    }, delay);
+                } else {
+                    // Balanced: start immediately like original
+                    runTrafficThread(i, nodesToUse, signal, strategy);
+                }
+            }
         };
 
-        // 1. Initial Latency Check + keep updating every second
-        runLatencySweep();
-        latencyTimerRef.current = setInterval(runLatencySweep, CONFIG.latencyUpdateInterval);
+        // Latency sweep only for balanced strategy
+        if (strategy.hasLatencySweep) {
+            const interval = strategy.useJitter
+                ? CONFIG.latencyUpdateInterval + Math.floor(Math.random() * CONFIG.latencySweepJitterMs * 2) - CONFIG.latencySweepJitterMs
+                : CONFIG.latencyUpdateInterval;
 
-        // 2. Launch Thread Pool
-        const actualThreads = Math.max(1, Math.min(64, threadCount));
-        for (let i = 0; i < actualThreads; i++) {
-            runTrafficThread(i, nodes, signal);
+            const runLatencySweep = () => {
+                if (signal.aborted) return;
+
+                nodes.forEach(node => {
+                    const entry = nodeStatsRef.current[node.id];
+                    if (!entry || entry.isPinging) return;
+
+                    entry.isPinging = true;
+                    if (entry.status === 'pending') entry.status = 'pinging';
+
+                    measureLatency(node, signal)
+                        .then(lat => {
+                            if (!signal.aborted && nodeStatsRef.current[node.id]) {
+                                if (lat !== null) {
+                                    nodeStatsRef.current[node.id].latency = lat;
+                                }
+                            }
+                        })
+                        .finally(() => {
+                            if (nodeStatsRef.current[node.id]) {
+                                nodeStatsRef.current[node.id].isPinging = false;
+                            }
+                        });
+                });
+            };
+
+            runLatencySweep();
+            latencyTimerRef.current = setInterval(runLatencySweep, interval);
         }
 
-        // 3. Start Aggregator
-        refreshTimerRef.current = setInterval(updateAggregates, CONFIG.chartUpdateInterval);
+        // Launch threads and aggregator
+        launchThreads();
+
+        // Aggregate timer — jittered only for smart strategy
+        const makeAggregateInterval = () => {
+            if (strategy.useJitter) {
+                return CONFIG.chartUpdateInterval +
+                    Math.floor(Math.random() * CONFIG.aggregateJitterMs * 2) - CONFIG.aggregateJitterMs;
+            }
+            return CONFIG.chartUpdateInterval;
+        };
+
+        if (strategy.useJitter) {
+            // Smart: self-scheduling with jitter
+            const scheduleNext = () => {
+                if (refreshTimerRef.current === null) return;
+                refreshTimerRef.current = setTimeout(() => {
+                    updateAggregates();
+                    if (!abortControllerRef.current?.signal.aborted) scheduleNext();
+                }, makeAggregateInterval());
+            };
+            refreshTimerRef.current = setTimeout(() => {
+                updateAggregates();
+                scheduleNext();
+            }, makeAggregateInterval());
+        } else {
+            // Balanced: original fixed-interval setInterval
+            refreshTimerRef.current = setInterval(updateAggregates, CONFIG.chartUpdateInterval);
+        }
     };
 
     const stopTest = () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-        if (refreshTimerRef.current) {
-            clearInterval(refreshTimerRef.current);
+        if (refreshTimerRef.current !== null) {
+            if (aggregateUsesIntervalRef.current) {
+                clearInterval(refreshTimerRef.current);
+            } else {
+                clearTimeout(refreshTimerRef.current);
+            }
             refreshTimerRef.current = null;
         }
         if (latencyTimerRef.current) {

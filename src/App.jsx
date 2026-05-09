@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from './components/DashboardLayout';
 import { useSpeedTest } from './hooks/useSpeedTest';
+import { balancedStrategy, smartStrategy } from './hooks/useSpeedTest.strategies';
 
 // Configuration for loading external data
 const DATA_URL = '/data/test-groups.json';
@@ -44,6 +45,8 @@ function App() {
     if (typeof window === 'undefined') return 'dark';
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
+  const [speedStrategy, setSpeedStrategy] = useState(balancedStrategy);
+  const [smartConfig, setSmartConfig] = useState({ topK: 8, screeningRequests: 2 });
 
   const {
     isTesting,
@@ -102,15 +105,15 @@ function App() {
     };
   }, []);
 
-  const handleStart = (threadCount = 16) => {
+  const handleStart = (threadCount = 16, cfg = {}) => {
     if (!selectedNodes || selectedNodes.length === 0) {
       setShowNoNodeToast(true);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setShowNoNodeToast(false), 2200);
-      startTest(selectedNodes, threadCount);
+      startTest(selectedNodes, threadCount, speedStrategy, cfg);
       return;
     }
-    startTest(selectedNodes, threadCount);
+    startTest(selectedNodes, threadCount, speedStrategy, cfg);
   };
 
   const effectiveTheme = theme === 'system' ? resolvedTheme : theme;
@@ -139,6 +142,10 @@ function App() {
       onToggleTheme={handleToggleTheme}
       startDisabled={!selectedNodes || selectedNodes.length === 0}
       showNoNodeToast={showNoNodeToast}
+      speedStrategy={speedStrategy}
+      onStrategyChange={setSpeedStrategy}
+      smartConfig={smartConfig}
+      onSmartConfigChange={setSmartConfig}
     />
   );
 }
