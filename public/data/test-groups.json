@@ -1,110 +1,62 @@
 {
-  "version": 2,
-  "updatedAt": "2026-02-01",
+  "version": 13,
+  "updatedAt": "2026-05-09",
   "groups": {
     "mobile": {
-      "name": "移动节点 (单节点并行)",
+      "name": "移动节点",
       "color": "#0070F3",
       "nodes": [
-        {
-          "id": 107,
-          "name": "移动节点 - 中国移动云盘[定向]",
-          "url": "https://yun.mcloud.139.com/mCloudPc/v832/mCloud_Setup-001.exe"
-        }
+        { "id": 101, "name": "移动节点 - 咪咕快游", "url": "https://gcache.migu.cn/prod/upload/game_resource/channel_for_homepage_game2/202408/2909/59/20240829095855985_mgwebp1.jpg" },
+        { "id": 102, "name": "移动节点 - 中国移动云盘", "url": "https://yun.mcloud.139.com/hongseyunpan/2.43G.zip" },
+        { "id": 103, "name": "移动节点 - 咪咕视频", "url": "https://img.cmvideo.cn/publish/noms/2023/12/06/1O4SHFIFR36BD.gif" },
+        { "id": 105, "name": "移动节点 - 咪咕音乐", "url": "https://wsdkdl.migu.cn/common/mgmusic/migu_https.js" },
+        { "id": 106, "name": "移动节点 - 咪咕爱看[定向]", "url": "https://img.aikan.miguvideo.com/publish/noms/2024/04/22/1O5MNLF3AN2JL.gif" },
+        { "id": 107, "name": "移动节点 - 中国移动云盘[定向]", "url": "https://yun.mcloud.139.com/mCloudPc/v832/mCloud_Setup-001.exe" }
+      ]
+    },
+    "unicom": {
+      "name": "联通节点",
+      "color": "#FF4D4F",
+      "nodes": [
+        { "id": 301, "name": "联通官网 - 图片资源 2", "url": "https://www.10010.com/wt_service_web/copyright/images/jifenshangcheng.png" },
+        { "id": 302, "name": "联通官网 - 图片资源 3", "url": "https://iservice.10010.com/wt_manage/uploadImg/1730297793913.png" },
+        { "id": 303, "name": "联通官网 - 静态资源 1", "url": "https://www.10010.com/wt_service_web/js/header.js" }
       ]
     },
     "telecom": {
-      "name": "电信节点 (单节点并行)",
+      "name": "电信节点",
       "color": "#F5A623",
       "nodes": [
-        {
-          "id": 202,
-          "name": "电信节点 - 天翼云桌面",
-          "url": "https://desk.ctyun.cn:8999/desktop-prod/software/windows_tob_client/15/64/202030001/CtyunClouddeskUniversal_2.3.0_202030001_x86_20240327104015_Setup.exe"
-        }
+        { "id": 201, "name": "电信节点 - 天翼云盘", "url": "https://static.e.189.cn/open/login/page/web/v5.0/static/js/captch.min.js?v1.1" },
+        { "id": 202, "name": "电信节点 - 天翼云桌面", "url": "https://desk.ctyun.cn:8999/desktop-prod/software/windows_tob_client/15/64/202030001/CtyunClouddeskUniversal_2.3.0_202030001_x86_20240327104015_Setup.exe" }
       ]
     },
     "global": {
-      "name": "全球节点 (单节点并行)",
-      "color": "#7928CA",
-      "nodes": [
-        {
-          "id": 301,
-          "name": "全球节点 - 微软Azure",
-          "url": "https://cdn.microsoftstore.com.cn/media/product_long_description/3781-00000/2_dupn50xr/4h0yzz2_360.jpg"
-        },
-        {
-          "id": 302,
-          "name": "全球节点 - Apple-Speed[Global]",
-          "url": "https://js-cdn.music.apple.com/musickit/v2/amp/musickit.js"
-        },
-        {
-          "id": 303,
-          "name": "全球节点 - Apple-Speed 2 [Global]",
-          "url": "https://store.storevideos.cdn-apple.com/v1/store.apple.com/st/1666383693478/atvloop-video-202210/streams_atvloop-video-202210/1920x1080/fileSequence3.m4s"
-        },
-        {
-          "id": 304,
-          "name": "全球节点 - Google-Speed[Global]",
-          "url": "https://fonts.gstatic.com/s/roboto/v47/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2"
-        },
-        {
-          "id": 305,
-          "name": "全球节点 - Cloudflare Speed[Global]",
-          "url": "https://speed.cloudflare.com/__down?bytes=25000000"
-        },
-        {
-          "id": 306,
-          "name": "全球节点 - Cloudflare Speed 2 [Global]",
-          "url": "https://speed.cloudflare.com/__down?bytes=104857600"
-        },
-        {
-          "id": 307,
-          "name": "全球节点 - Steam Akamai",
-          "url": "https://cdn.akamai.steamstatic.com/steam/apps/1063730/extras/NW_Sword_Sorcery_2.gif"
-        },
-        {
-          "id": 308,
-          "name": "全球节点 - Steam Cloudflare",
-          "url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1063730/extras/NW_Sword_Sorcery_2.gif"
-        }
-      ]
-    },
-    "cdn": {
-      "name": "特殊CDN加速节点 (单节点并行)",
+      "name": "全球节点",
       "color": "#10B981",
       "nodes": [
-        {
-          "id": 401,
-          "name": "阿里云-静态资源",
-          "url": "https://g.alicdn.com/AWSC/fireyejs/1.228.23/fireyejs.js"
-        },
-        {
-          "id": 402,
-          "name": "微信-静态资源",
-          "url": "https://res.wx.qq.com/open/zh_CN/htmledition/res/dev/download/sdk/WeChatSDK1.7.5.zip"
-        },
-        {
-          "id": 403,
-          "name": "百度网盘-静态资源",
-          "url": "https://nd-static.bdstatic.com/m-static/v20-main/home/js/chunk-vendors.f3d214b0.js"
-        },
-        {
-          "id": 404,
-          "name": "联想-静态资源",
-          "url": "https://smartdl.lenovo.com.cn/lzupdate/forhome/LZSetup.exe"
-        }
+        { "id": 401, "name": "全球节点 - 微软Azure", "url": "https://cdn.microsoftstore.com.cn/media/product_long_description/3781-00000/2_dupn50xr/4h0yzz2_360.jpg" },
+        { "id": 402, "name": "Cloudflare Speed - 25MB (Local)", "url": "https://fluxspeed.pages.dev/25mb.bin" },
+        { "id": 403, "name": "Cloudflare Speed - 100MB", "url": "https://speed.cloudflare.com/__down?bytes=104857600" },
+        { "id": 404, "name": "Vultr - 新泽西 (NJ)", "url": "https://nj-us-ping.vultr.com/vultr.com.100MB.bin" },
+        { "id": 405, "name": "Vultr - 洛杉矶 (LAX)", "url": "https://lax-ca-us-ping.vultr.com/vultr.com.100MB.bin" },
+        { "id": 406, "name": "Vultr - 东京 (HND)", "url": "https://hnd-jp-ping.vultr.com/vultr.com.100MB.bin" },
+        { "id": 407, "name": "Vultr - 新加坡 (SGP)", "url": "https://sgp-ping.vultr.com/vultr.com.100MB.bin" },
+        { "id": 408, "name": "全球节点 - Apple Music", "url": "https://js-cdn.music.apple.com/musickit/v2/amp/musickit.js" },
+        { "id": 409, "name": "全球节点 - Apple Video", "url": "https://store.storevideos.cdn-apple.com/v1/store.apple.com/st/1666383693478/atvloop-video-202210/streams_atvloop-video-202210/1920x1080/fileSequence3.m4s" },
+        { "id": 410, "name": "全球节点 - Google Fonts", "url": "https://fonts.gstatic.com/s/roboto/v47/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2" },
+        { "id": 411, "name": "全球节点 - Steam Akamai", "url": "https://cdn.akamai.steamstatic.com/steam/apps/1063730/extras/NW_Sword_Sorcery_2.gif" },
+        { "id": 412, "name": "全球节点 - Steam Cloudflare", "url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1063730/extras/NW_Sword_Sorcery_2.gif" }
       ]
     },
-    "slow": {
-      "name": "慢速打流节点 (用于测试)",
-      "color": "#EF4444",
+    "special_cdn": {
+      "name": "特殊CDN加速节点",
+      "color": "#6366F1",
       "nodes": [
-        {
-          "id": 501,
-          "name": "联通-静态资源",
-          "url": "https://m1.ad.10010.com/small_video/uploadImg/1669798519261.png"
-        }
+        { "id": 501, "name": "阿里云 - 静态资源", "url": "https://g.alicdn.com/AWSC/fireyejs/1.228.23/fireyejs.js" },
+        { "id": 502, "name": "微信 - 静态资源", "url": "https://res.wx.qq.com/open/zh_CN/htmledition/res/dev/download/sdk/WeChatSDK1.7.5.zip" },
+        { "id": 503, "name": "百度网盘 - 静态资源", "url": "https://nd-static.bdstatic.com/m-static/v20-main/home/js/chunk-vendors.f3d214b0.js" },
+        { "id": 504, "name": "联想 - 静态资源", "url": "https://smartdl.lenovo.com.cn/lzupdate/forhome/LZSetup.exe" }
       ]
     }
   }
